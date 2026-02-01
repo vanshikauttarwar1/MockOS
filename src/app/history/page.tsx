@@ -1,13 +1,24 @@
 import { PrismaClient } from '@prisma/client';
 import Link from 'next/link';
-import TopicCard from '../components/TopicCard';
 import { calculateProgress } from '../../lib/progress';
 
 // Force dynamic to ensure data is fresh
 export const dynamic = 'force-dynamic';
 const prisma = new PrismaClient();
 
-async function getTopicsWithHistory() {
+interface TopicWithHistory {
+    id: number;
+    name: string;
+    totalQuestions: number;
+    setsStarted: number;
+    scorePercent: number;
+    hasHistory: boolean;
+    allStagesCompleted: boolean;
+    completedStages: number;
+    questionsAnswered: number;
+}
+
+async function getTopicsWithHistory(): Promise<TopicWithHistory[]> {
     const topics = await prisma.topic.findMany({
         include: {
             _count: { select: { questions: true } },
@@ -19,7 +30,7 @@ async function getTopicsWithHistory() {
         }
     });
 
-    return topics.map((t: any) => {
+    return topics.map((t) => {
         const session = t.sessions[0];
 
         let progress = {
@@ -59,7 +70,7 @@ export default async function HistoryPage() {
                 gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
                 gap: '40px'
             }}>
-                {topics.map((topic: any) => (
+                {topics.map((topic) => (
                     topic.hasHistory ? (
                         <Link key={topic.id} href={`/history/${topic.id}`} className="card" style={{
                             display: 'flex',

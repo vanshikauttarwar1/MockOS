@@ -1,4 +1,6 @@
-export const GENERATE_QUESTIONS_SYSTEM_PROMPT = `You are an expert Product Management interview coach and assessment designer.
+import { Options } from './types';
+
+export const GENERATE_QUESTIONS_SYSTEM_PROMPT = `You are a Senior Product Management Mentor and assessment designer.
 
 Your task is to generate high-quality multiple choice questions (MCQs) that are realistic, scenario-based, and similar to those asked in real Product Manager interviews at top tech companies.
 
@@ -9,8 +11,8 @@ Output MUST be in valid JSON format only.
 Do not include any explanation outside JSON.`;
 
 export function generateUserPrompt(topicName: string) {
-  if (topicName === "Case Study") {
-    return `Generate exactly 50 unique Case Study MCQs for Product Manager interviews.
+   if (topicName === "Case Study") {
+      return `Generate exactly 50 unique Case Study MCQs for Product Manager interviews.
       
       CONTEXT: These questions must be mini-cases. You must provide a scenario (2-3 sentences) and then ask a strategic question based on it.
       
@@ -34,9 +36,9 @@ export function generateUserPrompt(topicName: string) {
       "You are the PM for Instagram Stories. Engagement has dropped 10% after the last release. The engineering team says the release improved load times by 20%. What is the most likely root cause?"
       
       Return all 50 questions in strict JSON format.`;
-  }
+   }
 
-  return `Generate exactly 50 unique multiple-choice questions for Product Manager interviews on the topic: "${topicName}".
+   return `Generate exactly 50 unique multiple-choice questions for Product Manager interviews on the topic: "${topicName}".
 
 STRICT DIFFICULTY DISTRIBUTION (must follow exactly):
 - Questions 1-10: Easy (target: 1–2 years experience)
@@ -101,16 +103,27 @@ OUTPUT FORMAT:
 Return all 50 questions in this exact format.`;
 }
 
-export const GENERATE_EXPLANATION_SYSTEM_PROMPT = `You are a senior Product Management mentor at a top-tier tech company (Google, Meta, Amazon).
+export const GENERATE_EXPLANATION_SYSTEM_PROMPT = `You are a Senior Product Management Mentor at a top-tier tech company (Google, Meta, Amazon).
 
 Your role is to provide DEEP, EDUCATIONAL explanations that help candidates truly understand PM concepts - not just memorize answers.
 
 TEACHING STYLE:
-- Explain like you're mentoring a promising PM candidate
-- Connect answers to real-world product scenarios
-- Reference industry examples when relevant (e.g., "This is similar to how Spotify approaches...")
-- Teach the underlying principle, not just the specific answer
-- Help build intuition for similar future questions
+- Explain like you're mentoring a promising PM candidate.
+- Connect answers to rich example product scenarios that provide "deeper learning".
+- Start examples with an engaging "hook" to draw the user in.
+- Reference detailed industry examples when relevant (e.g., "This is identical to the challenge Netflix faced when...").
+- Teach the underlying principle and its nuances, not just the specific answer.
+
+VISUAL LEARNING & DIAGRAMS (CONDITIONAL):
+- Include a Mermaid diagram (flowchart, funnel, or state diagram) ONLY when it adds significant value to the explanation (e.g., visualizing a process, decision tree, or logical flow).
+- Do NOT forcefully create a diagram for every question. If the concept is better explained through text alone, skip the diagram.
+- Use funnels (\`\`\`mermaid funnel\` blocks or flowcharts representing stages) for conversion or acquisition questions.
+- For diagrams, use colorful styles to make them visually appealing.
+- Define classes for colors, for example:
+  classDef primary fill:#3498db,stroke:#2980b9,stroke-width:2px,color:#fff;
+  classDef secondary fill:#e67e22,stroke:#d35400,stroke-width:2px,color:#fff;
+  classDef success fill:#2ecc71,stroke:#27ae60,stroke-width:2px,color:#fff;
+- Apply these classes to your nodes.
 
 FRAMEWORKS TO REFERENCE:
 - AARRR (Pirate Metrics), RICE, ICE, CIRCLES, HEART
@@ -121,53 +134,53 @@ FRAMEWORKS TO REFERENCE:
 
 Be thorough and educational. This is a learning opportunity.`;
 
-export function generateExplanationPrompt(question: string, options: any, correct: string, userAns: string) {
-  const isCorrect = correct === userAns;
+export function generateExplanationPrompt(question: string, options: Options, correct: string, userAns: string) {
+   const isCorrect = correct === userAns;
 
-  let sections = '';
+   let sections = '';
 
-  if (isCorrect) {
-    sections = `
-The user answered CORRECTLY. Provide a DEEP explanation:
-
+   if (isCorrect) {
+      sections = `
 1. WHY ${correct} IS THE BEST ANSWER:
-   - Explain the core reasoning using specific PM frameworks
-   - Connect to real product scenarios or industry examples
+   - Explain the core reasoning using specific PM frameworks.
+   - Connect to a deep example with an engaging hook.
    
-2. DEEPER UNDERSTANDING:
-   - Explain the underlying PM principle being tested
-   - How would this apply in different contexts/companies?
+2. VISUAL FLOW / LOGIC (Optional Mermaid Diagram):
+   - Provide a colorful Mermaid diagram (using \`\`\`mermaid\` blocks) ONLY if it clarifies a process, trade-off, or framework related to this question.
+   - If a funnel is relevant, use a flowchart to represent the stages.
    
-3. PM FRAMEWORK SPOTLIGHT:
-   - Name the key framework/concept
-   - Brief explanation of when to apply it
+3. DEEPER UNDERSTANDING:
+   - Explain the underlying PM principle being tested in depth.
+   - How would this principle manifest in different company cultures (e.g., data-driven vs. vision-driven)?
+   
+4. PM FRAMEWORK SPOTLIGHT:
+   - Name the key framework/concept.
+   - Provide a nuanced explanation of when (and when NOT) to apply it.
 
-4. PRO TIP:
-   - One advanced insight a senior PM would know about this topic`;
-  } else {
-    sections = `
-The user answered INCORRECTLY. Provide a TEACHING-focused explanation:
-
+5. PRO TIP (Senior PM Perspective):
+   - Share a sophisticated insight or a common "hidden" pitfall related to this topic.`;
+   } else {
+      sections = `
 1. WHY ${correct} IS THE CORRECT ANSWER:
-   - Explain the reasoning step-by-step
-   - Reference specific PM frameworks that support this
-   - Use a real product example if helpful
+   - Explain the reasoning step-by-step with deep context.
+   - Reference specific PM frameworks and a high-stakes example with a strong hook.
 
-2. WHY ${userAns} IS INCORRECT:
-   - Identify the specific misconception or trap
-   - Explain why this thinking is flawed in PM context
-   - What would choosing this option lead to in practice?
+2. VISUAL FLOW / LOGIC (Optional Mermaid Diagram):
+   - Provide a colorful Mermaid diagram (using \`\`\`mermaid\` blocks) ONLY if it helps visualize why the correct answer is superior or shows the logic in action.
+   
+3. WHY ${userAns} IS INCORRECT (Common Trap):
+   - Identify the specific misconception or "managerial" trap (e.g., over-indexing on technical constraints vs. user value).
+   - Explain what would happen in a real product if you chose this path.
 
-3. THE KEY LESSON:
-   - What PM principle should they remember?
-   - How to avoid this mistake in interviews?
+4. THE KEY LESSON & DEEPER LEARNING:
+   - What fundamental PM principle was missed?
+   - Connect to broader concepts candidates should master for senior roles.
 
-4. DEEPER LEARNING:
-   - Connect to broader PM concepts
-   - Related topics they should study`;
-  }
+5. INTERVIEW TIP:
+   - How to articulate this reasoning clearly in a live interview setting.`;
+   }
 
-  return `A user answered a Product Management interview question.
+   return `A user answered a Product Management interview question.
 
 QUESTION:
 ${question}
@@ -182,14 +195,14 @@ CORRECT ANSWER: ${correct}
 USER'S ANSWER: ${userAns}
 
 INSTRUCTIONS:
-- Provide a COMPREHENSIVE, EDUCATIONAL explanation
-- This is a LEARNING moment - be thorough, not brief
-- Use clear section headers
-- Reference PM frameworks and real examples
-- Do NOT use markdown bold/asterisks (**)
-- Use plain text formatting only
+- Provide a COMPREHENSIVE, EDUCATIONAL explanation.
+- This is a DEEPER LEARNING moment - be thorough and detailed.
+- Use clear section headers.
+- Emphasize depth and engaging hooks in your examples.
+- Include a Mermaid diagram ONLY if it adds value.
+- You can use markdown for formatting (bold, italics, lists).
 
 ${sections}
 
-Aim for 200-300 words. Be thorough and educational.`;
+Aim for 400-500 words. Be thorough, mentoring, and highly educational.`;
 }

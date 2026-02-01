@@ -3,6 +3,19 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 
+interface StageProgress {
+    isCompleted: boolean;
+    answered: number;
+    score: number;
+}
+
+interface TopicDetailData {
+    topicName: string;
+    stageProgress: Record<number, StageProgress>;
+    completedCount: number;
+    scorePercent: number;
+}
+
 interface Stage {
     number: number;
     questionCount: number;
@@ -21,10 +34,11 @@ const STAGES: Stage[] = [
 export default function TopicDetail() {
     const { id } = useParams();
     const router = useRouter();
-    const [topic, setTopic] = useState<any>(null);
+    const [topic, setTopic] = useState<TopicDetailData | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        if (!id) return;
         // Fetch detailed history which has stageProgress
         fetch(`/api/history/${id}`)
             .then(res => res.json())
@@ -46,25 +60,23 @@ export default function TopicDetail() {
             });
             const data = await res.json();
 
-            if (data.sessionId && data.questions) {
+            if (data.sessionId && data.questions && topic) {
                 localStorage.setItem('currentTestSession', JSON.stringify({
                     sessionId: data.sessionId,
                     questions: data.questions,
+                    answers: data.answers || {}, // Persist existing answers
                     stage: stageNum,
-                    topicName: topic.topicName // api/history returns topicName
+                    topicName: topic.topicName
                 }));
                 router.push(`/test/${data.sessionId}`);
             }
-        } catch (e) {
+        } catch {
             alert("Failed to start stage");
         }
     };
 
     if (loading) return <div className="container" style={{ paddingTop: '60px' }}>Loading...</div>;
     if (!topic) return <div className="container" style={{ paddingTop: '60px' }}>Topic not found</div>;
-
-    // api/history returns { topicName, stageProgress, setsStarted }
-    // We map STAGES against this data.
 
     return (
         <div style={{ paddingTop: '60px', maxWidth: '800px', margin: '0 auto' }}>
@@ -131,7 +143,6 @@ export default function TopicDetail() {
                                             {isCompleted ? 'Retake' : (isStarted ? 'Continue' : 'Start Set')}
                                         </button>
 
-                                        {/* Status Text Below Button */}
                                         {!isCompleted && isStarted && (
                                             <span style={{ fontSize: '0.8rem', color: '#84cc16', fontWeight: 600 }}>
                                                 {remaining} questions remaining

@@ -3,20 +3,41 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 
+interface UserAnswer {
+    isCorrect: boolean;
+    selectedOption: string;
+    question: {
+        text: string;
+        correctOption: string;
+        explanation: string;
+    };
+}
+
+interface ResultSession {
+    topic: {
+        id: number;
+    };
+    scorePercent: number;
+    totalCorrect: number;
+    setsStarted: number;
+    userAnswers: UserAnswer[];
+}
+
 export default function ResultPage() {
     const { sessionId } = useParams();
     const router = useRouter();
-    const [session, setSession] = useState<any>(null);
+    const [session, setSession] = useState<ResultSession | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        if (!sessionId) return;
         fetch(`/api/session/${sessionId}`)
             .then(res => res.json())
             .then(data => {
                 setSession(data);
                 setLoading(false);
             })
-            .catch(e => setLoading(false));
+            .catch(() => setLoading(false));
     }, [sessionId]);
 
     if (loading) return <div className="container" style={{ paddingTop: '40px' }}>Loading result...</div>;
@@ -39,7 +60,7 @@ export default function ResultPage() {
             </div>
 
             <div style={{ display: 'grid', gap: '16px' }}>
-                {session.userAnswers.map((ans: any, idx: number) => (
+                {session.userAnswers.map((ans, idx) => (
                     <div key={idx} className="card" style={{ padding: '20px', borderLeft: `4px solid ${ans.isCorrect ? 'var(--success)' : 'var(--error)'}` }}>
                         <div style={{ display: 'flex', gap: '12px' }}>
                             <div style={{ fontWeight: 700, minWidth: '24px' }}>{idx + 1}.</div>

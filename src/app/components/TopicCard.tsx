@@ -38,8 +38,9 @@ export default function TopicCard({ topic }: { topic: TopicProps }) {
 
             alert('Questions generated! Refreshing...');
             window.location.reload();
-        } catch (err: any) {
-            alert(`Error: ${err.message}. Please check your API key.`);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            alert(`Error: ${message}. Please check your API key.`);
         } finally {
             setLoading(false);
         }
@@ -120,7 +121,7 @@ export default function TopicCard({ topic }: { topic: TopicProps }) {
                             disabled={loading}
                             style={{ width: '100%' }}
                         >
-                            {loading ? 'Generating...' : 'Initialize'}
+                            {loading ? 'Preparing...' : 'Initialize'}
                         </button>
                     ) : (
                         <button

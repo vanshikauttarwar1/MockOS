@@ -23,10 +23,11 @@ export default function Navbar() {
                 alignItems: 'center',
                 justifyContent: 'space-between'
             }}>
-                <Link href="/" style={{ textDecoration: 'none', fontWeight: 700, fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)' }}>
-                    {/* Simple Icon placeholder */}
-                    <div style={{ width: '24px', height: '24px', background: 'var(--primary)', borderRadius: '6px' }}></div>
-                    <span>SwitchOS PM <span style={{ opacity: 0.5 }}>Mock</span></span>
+                <Link href="/" style={{ textDecoration: 'none', fontWeight: 700, fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)' }}>
+                    <img src="/logo.png" alt="SwitchOS Logo" style={{ width: '32px', height: '32px', borderRadius: '8px' }} />
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        SwitchOS <span style={{ opacity: 0.5, fontWeight: 500 }}>PM Mock</span>
+                    </span>
                 </Link>
 
                 <div style={{ display: 'flex', gap: '32px', fontSize: '0.95rem', fontWeight: 500, color: 'var(--text-dim)' }}>

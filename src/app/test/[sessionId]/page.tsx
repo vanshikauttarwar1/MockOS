@@ -1,258 +1,245 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
+import { Session, Answers } from '@/lib/types';
+import DetailedExplanation from '@/app/components/DetailedExplanation';
 
 export default function TestPage() {
+    const { sessionId } = useParams();
     const router = useRouter();
-    const [session, setSession] = useState<any>(null);
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const [selectedOption, setSelectedOption] = useState<string | null>(null);
-    const [feedback, setFeedback] = useState<string | null>(null);
+
+    const [session, setSession] = useState<Session | null>(null);
+    const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+    const [answers, setAnswers] = useState<Answers>({});
     const [explanation, setExplanation] = useState<string | null>(null);
     const [loadingExplanation, setLoadingExplanation] = useState(false);
-
-    const [answers, setAnswers] = useState<any>({});
+    const [showIncorrectPopup, setShowIncorrectPopup] = useState(false);
 
     useEffect(() => {
-        const data = localStorage.getItem('currentTestSession');
-        if (data) {
-            setSession(JSON.parse(data));
-        } else {
-            router.push('/');
-        }
-    }, [router]);
+        const stored = localStorage.getItem('currentTestSession');
+        if (stored) {
+            const data = JSON.parse(stored);
+            setSession(data);
+            if (data.answers) {
+                setAnswers(data.answers);
 
-    if (!session) return <div className="container" style={{ paddingTop: '60px' }}>Loading...</div>;
-
-    const question = session.questions?.[currentIndex];
-    if (!question) {
-        return (
-            <div className="container" style={{ paddingTop: '60px', textAlign: 'center' }}>
-                <h3>Error loading question</h3>
-                <button
-                    className="secondary-btn"
-                    onClick={() => router.push('/')}
-                >
-                    Return to Dashboard
-                </button>
-            </div>
-        );
-    }
-
-    const isLast = currentIndex === session.questions.length - 1;
-
-    const handleOptionSelect = async (optKey: string) => {
-        if (selectedOption) return;
-        setSelectedOption(optKey);
-
-        // Instant Feedback Local
-        const isCorrect = optKey === question.correctOption;
-        setFeedback(isCorrect ? 'correct' : 'wrong');
-
-        // Save answer
-        await fetch('/api/submit', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                sessionId: session.sessionId,
-                questionId: question.id,
-                selectedOption: optKey,
-                isCorrect,
-                stageNumber: session.stage
-            })
-        });
-
-        setAnswers({
-            ...answers,
-            [question.id]: { selected: optKey, isCorrect }
-        });
-    };
-
-    const handlePrevious = () => {
-        if (currentIndex > 0) {
-            const newIndex = currentIndex - 1;
-            setCurrentIndex(newIndex);
-
-            // Restore state for previous question
-            const prevQ = session.questions[newIndex];
-            const prevAnswer = answers[prevQ.id];
-
-            if (prevAnswer) {
-                setSelectedOption(prevAnswer.selected);
-                setFeedback(prevAnswer.isCorrect ? 'correct' : 'wrong');
-            } else {
-                setSelectedOption(null);
-                setFeedback(null);
+                // Find first unanswered question
+                const index = data.questions.findIndex((q: { id: number }) => !data.answers[q.id]);
+                if (index !== -1) {
+                    setCurrentQuestionIndex(index);
+                }
             }
-            setExplanation(null); // Reset explanation as we don't store it
-        }
-    };
-
-    const handleNext = () => {
-        if (isLast) {
-            router.push(`/session/${session.sessionId}/result`);
         } else {
-            const newIndex = currentIndex + 1;
-            setCurrentIndex(newIndex);
+            // Fallback fetch from API if localStorage is empty
+            fetch(`/api/session/${sessionId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) throw new Error(data.error);
+                    const formattedSession = {
+                        sessionId: data.id,
+                        questions: data.questions || data.topic.questions.slice(0, 10), // simplified for now
+                        stage: data.stageNumber || 1,
+                        topicName: data.topic.name
+                    };
+                    setSession(formattedSession);
 
-            // Restore state if we've been here before
-            const nextQ = session.questions[newIndex];
-            const existingAnswer = answers[nextQ.id];
+                    const dbAnswers: Answers = {};
+                    data.userAnswers?.forEach((ua: { questionId: number, selectedOption: string }) => {
+                        dbAnswers[ua.questionId] = ua.selectedOption;
+                    });
+                    setAnswers(dbAnswers);
+                })
+                .catch(() => router.push('/'));
+        }
+    }, [router, sessionId]);
 
-            if (existingAnswer) {
-                setSelectedOption(existingAnswer.selected);
-                setFeedback(existingAnswer.isCorrect ? 'correct' : 'wrong');
-            } else {
-                setSelectedOption(null);
-                setFeedback(null);
+    if (!session) return <div className="container" style={{ paddingTop: '60px' }}>Loading session...</div>;
+
+    const question = session.questions[currentQuestionIndex];
+    if (!question) return <div className="container">Question not found</div>;
+
+    const selectedOption = answers[question.id];
+    const isAnswered = !!selectedOption;
+
+    const handleOptionSelect = async (optionKey: string) => {
+        if (isAnswered) return;
+
+        const newAnswers = { ...answers, [question.id]: optionKey };
+        setAnswers(newAnswers);
+
+        // Record answer in DB
+        try {
+            await fetch('/api/submit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sessionId: parseInt(sessionId as string),
+                    questionId: question.id,
+                    selectedOption: optionKey,
+                    isCorrect: optionKey === question.correctOption,
+                    stageNumber: session.stage
+                })
+            });
+
+            // Update localStorage too for consistency
+            const stored = localStorage.getItem('currentTestSession');
+            if (stored) {
+                const data = JSON.parse(stored);
+                data.answers = newAnswers;
+                localStorage.setItem('currentTestSession', JSON.stringify(data));
             }
-            setExplanation(null);
+        } catch (error) {
+            console.error("Failed to record answer:", error);
+        }
+
+        if (optionKey !== question.correctOption) {
+            setShowIncorrectPopup(true);
         }
     };
 
-    const handleDeepExplain = async () => {
-        if (explanation) return;
+    const getExplanation = async (userAns: string) => {
         setLoadingExplanation(true);
-        setExplanation(""); // Clear previous if any
+        setExplanation("");
 
         try {
             const res = await fetch('/api/explain', {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     question: question.text,
                     options: question.options,
                     correctOption: question.correctOption,
-                    userOption: selectedOption
+                    userOption: userAns
                 })
             });
 
-            if (!res.ok) {
-                const errData = await res.json().catch(() => ({}));
-                throw new Error(errData.error || `Server error: ${res.status}`);
-            }
-            if (!res.body) throw new Error("No response body");
-
-            const reader = res.body.getReader();
-            const decoder = new TextDecoder();
-            let done = false;
-
-            while (!done) {
-                const { value, done: doneReading } = await reader.read();
-                done = doneReading;
-                const chunkValue = decoder.decode(value, { stream: true });
-                setExplanation((prev) => (prev || "") + chunkValue);
-            }
-        } catch (e: any) {
+            const text = await res.text();
+            setExplanation(text);
+        } catch (e: unknown) {
             console.error("Explain error:", e);
-            // Try to parse if it's a JSON error response
-            alert(`Failed to get explanation: ${e.message}`);
+            const message = e instanceof Error ? e.message : 'Unknown error';
+            alert(`Failed to get explanation: ${message}`);
         } finally {
             setLoadingExplanation(false);
         }
     };
 
+    const nextQuestion = () => {
+        setExplanation(null);
+        setShowIncorrectPopup(false);
+        if (currentQuestionIndex < session.questions.length - 1) {
+            setCurrentQuestionIndex(currentQuestionIndex + 1);
+        } else {
+            // End of stage
+            router.push(`/session/${sessionId}/result`);
+        }
+    };
+
+    const prevQuestion = () => {
+        if (currentQuestionIndex > 0) {
+            setExplanation(null);
+            setShowIncorrectPopup(false);
+            setCurrentQuestionIndex(currentQuestionIndex - 1);
+        }
+    };
+
     return (
-        <div style={{ paddingTop: '60px', maxWidth: '800px', margin: '0 auto' }}>
+        <div style={{ paddingTop: '60px', maxWidth: '800px', margin: '0 auto', paddingBottom: '100px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px', color: 'var(--text-dim)', fontSize: '0.9rem', fontWeight: 500 }}>
                 <span>{session.topicName} — Stage {session.stage}</span>
-                <span>Question {currentIndex + 1} / {session.questions.length}</span>
+                <span>Question {currentQuestionIndex + 1} of {session.questions.length}</span>
             </div>
 
-            <div className={`feedback-overlay ${feedback === 'correct' ? 'correct' : feedback === 'wrong' ? 'wrong' : ''}`} />
+            <div style={{ width: '100%', height: '6px', background: 'var(--surface-highlight)', borderRadius: '3px', marginBottom: '40px' }}>
+                <div style={{
+                    width: `${((currentQuestionIndex + (isAnswered ? 1 : 0)) / session.questions.length) * 100}%`,
+                    height: '100%', background: 'var(--accent)', borderRadius: '3px', transition: 'width 0.3s ease'
+                }} />
+            </div>
 
-            <div className="card" style={{ padding: '40px' }}>
-                <h2 style={{ fontSize: '1.5rem', lineHeight: '1.4', marginBottom: '32px', fontWeight: 600 }}>{question.text}</h2>
+            <h2 style={{ fontSize: '1.75rem', marginBottom: '40px', lineHeight: '1.4' }}>{question.text}</h2>
 
-                <div style={{ display: 'grid', gap: '16px' }}>
-                    {Object.entries(question.options).map(([key, val]: any) => {
-                        let bg = 'var(--surface)';
-                        let border = 'var(--border)';
-                        let color = 'var(--text-main)';
+            <div style={{ display: 'grid', gap: '12px' }}>
+                {(Object.entries(question.options) as [string, string][]).map(([key, text]) => {
+                    const isSelected = selectedOption === key;
+                    const isCorrectOption = key === question.correctOption;
 
-                        if (selectedOption) {
-                            if (key === question.correctOption) {
-                                bg = 'var(--success-bg)';
-                                border = 'var(--success)';
-                                color = 'var(--success)'; // Text green
-                            } else if (key === selectedOption && feedback === 'wrong') {
-                                bg = '#FEF2F2';
-                                border = 'var(--error)';
-                                color = 'var(--error)';
-                            }
+                    let borderColor = 'var(--border)';
+                    let background = 'var(--surface)';
+
+                    if (isAnswered) {
+                        if (isCorrectOption) {
+                            borderColor = 'var(--success)';
+                            background = isSelected ? 'rgba(34, 197, 94, 0.1)' : background;
+                        } else if (isSelected) {
+                            borderColor = 'var(--error)';
+                            background = 'rgba(239, 68, 68, 0.1)';
                         }
+                    } else if (isSelected) {
+                        borderColor = 'var(--accent)';
+                    }
 
-                        return (
-                            <div
-                                key={key}
-                                onClick={() => handleOptionSelect(key)}
-                                style={{
-                                    padding: '20px',
-                                    background: bg,
-                                    border: `1px solid ${border}`,
-                                    borderRadius: '12px',
-                                    cursor: selectedOption ? 'default' : 'pointer',
-                                    transition: 'all 0.2s ease',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    color: color
-                                }}
-                            >
-                                <span style={{
-                                    fontWeight: 700, marginRight: '16px', fontSize: '0.9rem',
-                                    width: '24px', height: '24px', borderRadius: '50%', border: `1px solid ${border}`,
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    flexShrink: 0
-                                }}>{key}</span>
-                                <span style={{ fontSize: '1rem' }}>{val}</span>
-                            </div>
-                        );
-                    })}
-                </div>
-
-                {selectedOption && (
-                    <div style={{ marginTop: '32px', paddingTop: '24px', borderTop: '1px solid var(--border)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontWeight: 600 }}>
-                            {feedback === 'correct' ? <span style={{ color: 'var(--success)' }}>Correct Answer</span> : <span style={{ color: 'var(--error)' }}>Incorrect</span>}
-                        </div>
-                        <p style={{ margin: '0 0 24px 0', color: 'var(--text-dim)', lineHeight: '1.6' }}>{question.explanation}</p>
-
-                        <div style={{ display: 'flex', gap: '16px' }}>
-                            {currentIndex > 0 && (
-                                <button
-                                    onClick={handlePrevious}
-                                    className="secondary-btn"
-                                >
-                                    Previous
-                                </button>
-                            )}
-                            <button
-                                onClick={handleNext}
-                                className="primary-btn"
-                            >
-                                {isLast ? 'Finish Set' : 'Next Question'}
-                            </button>
-                            <button
-                                onClick={handleDeepExplain}
-                                className="secondary-btn"
-                            >
-                                {loadingExplanation ? 'Thinking...' : '⚡ Explain'}
-                            </button>
-                        </div>
-
-                        {explanation && (
-                            <div style={{ marginTop: '24px', padding: '24px', background: 'var(--surface-highlight)', borderRadius: '12px', whiteSpace: 'pre-line', fontSize: '0.95rem', lineHeight: '1.6', color: 'var(--text-dim)' }}>
-                                <h4 style={{ marginTop: 0, color: 'var(--text-main)' }}>AI Coach Deep Dive:</h4>
-
-                                {/* Text Content Only */}
-                                <div>
-                                    {explanation.replace(/```[\s\S]*?```/g, '').replace(/\*\*/g, '')}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
+                    return (
+                        <button
+                            key={key}
+                            onClick={() => handleOptionSelect(key)}
+                            disabled={isAnswered}
+                            style={{
+                                display: 'flex', alignItems: 'flex-start', gap: '16px', padding: '20px', borderRadius: '12px',
+                                background, border: `2px solid ${borderColor}`, textAlign: 'left', cursor: isAnswered ? 'default' : 'pointer',
+                                transition: 'all 0.2s ease', fontSize: '1.05rem'
+                            }}
+                        >
+                            <span style={{
+                                fontWeight: 700, color: isAnswered && isCorrectOption ? 'var(--success)' : (isSelected ? 'var(--accent)' : 'var(--text-dim)'),
+                                minWidth: '24px'
+                            }}>{key}.</span>
+                            <span>{text}</span>
+                        </button>
+                    );
+                })}
             </div>
+
+            {isAnswered && (
+                <div style={{ marginTop: '40px' }}>
+                    {showIncorrectPopup && (
+                        <div style={{ padding: '16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--error)', borderRadius: '12px', marginBottom: '24px', color: 'var(--error)', fontWeight: 600 }}>
+                            Not quite right. Let&apos;s look at the correct framework below.
+                        </div>
+                    )}
+
+                    {explanation && (
+                        <div style={{ marginTop: '24px', padding: '24px', background: 'var(--surface-highlight)', borderRadius: '12px', fontSize: '1rem', lineHeight: '1.6' }}>
+                            <h4 style={{ marginTop: 0, marginBottom: '20px', color: 'var(--text-main)', fontSize: '1.1rem' }}>Expert Mentor Deep Dive:</h4>
+                            <DetailedExplanation content={explanation} />
+                        </div>
+                    )}
+
+                    <div style={{ marginTop: '32px', display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                            <button
+                                className="secondary-btn"
+                                onClick={prevQuestion}
+                                disabled={currentQuestionIndex === 0}
+                                style={{ opacity: currentQuestionIndex === 0 ? 0.5 : 1 }}
+                            >
+                                Previous
+                            </button>
+                            <button
+                                className="secondary-btn"
+                                onClick={() => getExplanation(selectedOption)}
+                                disabled={loadingExplanation || !!explanation}
+                            >
+                                {loadingExplanation ? 'Analyzing...' : 'Technical Expert'}
+                            </button>
+                        </div>
+                        <button className="primary-btn" onClick={nextQuestion}>
+                            {currentQuestionIndex < session.questions.length - 1 ? 'Next Question' : 'Finish Stage'}
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

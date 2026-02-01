@@ -16,6 +16,12 @@ export default function AdminPage() {
     const [secretKey, setSecretKey] = useState('');
     const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+    const fetchTopics = async () => {
+        const res = await fetch('/api/topics');
+        const data = await res.json();
+        setTopics(data);
+    };
+
     useEffect(() => {
         // Fetch topics only if authenticated (or just fetch publicly if that's safe, but better to hide)
         if (isAuthenticated) {
@@ -23,11 +29,6 @@ export default function AdminPage() {
         }
     }, [isAuthenticated]);
 
-    const fetchTopics = async () => {
-        const res = await fetch('/api/topics');
-        const data = await res.json();
-        setTopics(data);
-    };
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
@@ -58,8 +59,9 @@ export default function AdminPage() {
 
             alert(data.message);
             fetchTopics(); // Refresh stats
-        } catch (err: any) {
-            alert(`Error: ${err.message}`);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            alert(`Error: ${message}`);
         } finally {
             setLoading(null);
         }

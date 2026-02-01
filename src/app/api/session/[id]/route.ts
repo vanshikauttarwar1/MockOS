@@ -27,8 +27,33 @@ export async function GET(
 
         if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 });
 
-        return NextResponse.json(session);
-    } catch (error) {
+        // Fetch questions for the currently active stage
+        const stage = session.setsStarted || 1;
+        const skip = (stage - 1) * 10;
+        const questions = await prisma.question.findMany({
+            where: { topicId: session.topicId },
+            orderBy: { id: 'asc' },
+            skip: skip,
+            take: 10
+        });
+
+        return NextResponse.json({
+            ...session,
+            questions: questions.map(q => ({
+                id: q.id,
+                text: q.text,
+                options: {
+                    A: q.optionA,
+                    B: q.optionB,
+                    C: q.optionC,
+                    D: q.optionD
+                },
+                correctOption: q.correctOption,
+                explanation: q.explanation,
+                difficulty: q.difficulty
+            }))
+        });
+    } catch {
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

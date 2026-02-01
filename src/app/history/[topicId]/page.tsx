@@ -9,6 +9,19 @@ interface Stage {
     difficulty: string;
 }
 
+interface StageProgress {
+    score: number;
+    answered: number;
+    total: number;
+    isCompleted: boolean;
+}
+
+interface HistoryDetail {
+    topicName: string;
+    stageProgress: Record<number, StageProgress>;
+    setsStarted: number;
+}
+
 const STAGES: Stage[] = [
     { number: 1, questionCount: 10, difficulty: "Easy" },
     { number: 2, questionCount: 10, difficulty: "Easy-Medium" },
@@ -20,7 +33,7 @@ const STAGES: Stage[] = [
 export default function HistoryDetailPage() {
     const { topicId } = useParams();
     const router = useRouter();
-    const [data, setData] = useState<any>(null);
+    const [data, setData] = useState<HistoryDetail | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -37,7 +50,7 @@ export default function HistoryDetailPage() {
     if (loading) return <div className="container" style={{ paddingTop: '60px' }}>Loading history...</div>;
     if (!data) return <div className="container" style={{ paddingTop: '60px' }}>Topic history not found</div>;
 
-    const { topicName, stageProgress, setsStarted } = data;
+    const { topicName, stageProgress } = data;
 
     return (
         <div style={{ paddingTop: '60px', maxWidth: '800px', margin: '0 auto' }}>
@@ -186,4 +199,3 @@ export default function HistoryDetailPage() {
         </div>
     );
 }
-

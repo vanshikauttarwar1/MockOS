@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, UserAnswer } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -7,11 +7,6 @@ export async function GET(request: Request, props: { params: Promise<{ topicId: 
     const params = await props.params;
     try {
         const topicId = parseInt(params.topicId);
-
-        // Fetch the LATEST session for this topic (assuming linear progress)
-        // Or should we fetch *all* answers ever? 
-        // Typically "History" implies the user's best or current standing.
-        // Let's use the latest session for now as it represents current progress.
 
         const latestSession = await prisma.testSession.findFirst({
             where: { topicId },
@@ -23,7 +18,6 @@ export async function GET(request: Request, props: { params: Promise<{ topicId: 
         });
 
         if (!latestSession) {
-            // Check if topic exists at least
             const topic = await prisma.topic.findUnique({ where: { id: topicId } });
             if (!topic) return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
 
@@ -33,7 +27,6 @@ export async function GET(request: Request, props: { params: Promise<{ topicId: 
             });
         }
 
-        // Calculate scores and progress per stage
         const stageProgress: Record<number, {
             score: number,
             answered: number,
@@ -41,10 +34,9 @@ export async function GET(request: Request, props: { params: Promise<{ topicId: 
             isCompleted: boolean
         }> = {};
 
-        // Group answers by stage
         const answersByStage: Record<number, { total: number, correct: number }> = {};
 
-        latestSession.userAnswers.forEach((ans: any) => {
+        latestSession.userAnswers.forEach((ans: UserAnswer) => {
             const stage = ans.stageNumber;
             if (!answersByStage[stage]) {
                 answersByStage[stage] = { total: 0, correct: 0 };
@@ -55,12 +47,10 @@ export async function GET(request: Request, props: { params: Promise<{ topicId: 
             }
         });
 
-        // Compute detailed stats
         let completedCount = 0;
         Object.keys(answersByStage).forEach(key => {
             const stageNum = parseInt(key);
             const data = answersByStage[stageNum];
-            // Hardcoded 5 stages, 10 questions each as per requirements
             const QUESTIONS_PER_STAGE = 10;
             const isCompleted = data.total >= QUESTIONS_PER_STAGE;
 
@@ -80,7 +70,7 @@ export async function GET(request: Request, props: { params: Promise<{ topicId: 
             topicName: latestSession.topic.name,
             stageProgress,
             setsStarted: latestSession.setsStarted,
-            completedCount // Explicit count of fully completed stages
+            completedCount
         });
 
     } catch (error) {

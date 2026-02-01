@@ -5,6 +5,7 @@ import {
     GENERATE_EXPLANATION_SYSTEM_PROMPT,
     generateExplanationPrompt
 } from './prompts';
+import { Options } from './types';
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
@@ -39,7 +40,7 @@ export async function generateQuestions(topicName: string) {
     }
 }
 
-export async function generateExplanation(question: string, options: any, correct: string, userAns: string) {
+export async function generateExplanation(question: string, options: Options, correct: string, userAns: string) {
     try {
         const response = await openai.chat.completions.create({
             model: "gpt-4o-mini",
@@ -57,7 +58,7 @@ export async function generateExplanation(question: string, options: any, correc
         throw error;
     }
 }
-export async function generateExplanationStream(question: string, options: any, correct: string, userAns: string) {
+export async function generateExplanationStream(question: string, options: Options, correct: string, userAns: string) {
     try {
         const stream = await openai.chat.completions.create({
             model: "gpt-4o-mini",

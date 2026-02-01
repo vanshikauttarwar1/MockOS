@@ -4,7 +4,7 @@ import Navbar from './components/Navbar';
 
 export const metadata: Metadata = {
   title: 'PM Mock Master',
-  description: 'AI-Powered Product Manager Mock Tests',
+  description: 'Expert-led Product Manager Mock Tests',
 };
 
 export default function RootLayout({

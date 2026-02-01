@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
-const DEMO_USER_ID = 1; // Hardcoded for MVP
 
 export async function GET() {
     try {
@@ -22,7 +21,7 @@ export async function GET() {
         });
 
         // Format response
-        const data = topics.map((t: any) => {
+        const data = topics.map((t) => {
             const latestSession = t.sessions[0];
 
             let questionsAnswered = 0;
@@ -33,7 +32,7 @@ export async function GET() {
 
                 // Calculate completed stages (10 answers per stage)
                 const answerCounts: Record<number, number> = {};
-                latestSession.userAnswers.forEach((a: any) => {
+                latestSession.userAnswers.forEach((a) => {
                     answerCounts[a.stageNumber] = (answerCounts[a.stageNumber] || 0) + 1;
                 });
 
