@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+
+model Topic {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  questions Question[]
+  sessions  TestSession[]
+}
+
+model Question {
+  id               Int      @id @default(autoincrement())
+  topicId          Int
+  topic            Topic    @relation(fields: [topicId], references: [id])
+  difficulty       String   // Easy, Medium, Hard, etc.
+  experienceLevel  String   // 1-2, 2-4, etc.
+  text             String
+  optionA          String
+  optionB          String
+  optionC          String
+  optionD          String
+  correctOption    String   // "A", "B", "C", "D"
+  explanation      String
+  
+  userAnswers      UserAnswer[]
+}
+
+model TestSession {
+  id            Int          @id @default(autoincrement())
+  topicId       Int
+  topic         Topic        @relation(fields: [topicId], references: [id])
+  startedAt     DateTime     @default(now())
+  endedAt       DateTime?
+  isCompleted   Boolean      @default(false)
+  setsStarted   Int          @default(0) // 0 to 5
+  totalCorrect  Int          @default(0)
+  scorePercent  Float        @default(0.0)
+  
+  userAnswers   UserAnswer[]
+}
+
+model UserAnswer {
+  id             Int          @id @default(autoincrement())
+  sessionId      Int
+  session        TestSession  @relation(fields: [sessionId], references: [id])
+  questionId     Int
+  question       Question     @relation(fields: [questionId], references: [id])
+  selectedOption String       // "A", "B", etc.
+  isCorrect      Boolean
+  stageNumber    Int          // 1-5
+}
