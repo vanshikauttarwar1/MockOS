@@ -1,69 +1,47 @@
-import { PrismaClient } from '@prisma/client';
-import TopicCard from './components/TopicCard';
+'use client';
 
-export const dynamic = 'force-dynamic';
-const prisma = new PrismaClient();
+import { useState, useEffect } from 'react';
+import CategoryCard from './components/CategoryCard';
 
-interface TopicData {
+interface Category {
   id: number;
   name: string;
+  description: string;
+  subcategoryCount: number;
+  completedSubcategories: number;
+  progressPercent: number;
   totalQuestions: number;
-  setsStarted: number;
-  scorePercent: number;
   questionsAnswered: number;
-  completedStages: number;
 }
 
-async function getTopics(): Promise<TopicData[]> {
-  const topics = await prisma.topic.findMany({
-    include: {
-      _count: { select: { questions: true } },
-      sessions: {
-        orderBy: { startedAt: 'desc' },
-        take: 1,
-        include: { userAnswers: true }
-      }
-    }
-  });
+export default function Home() {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  return topics.map(t => {
-    const latestSession = t.sessions[0];
-
-    let questionsAnswered = 0;
-    let completedStages = 0;
-
-    if (latestSession && latestSession.userAnswers) {
-      questionsAnswered = latestSession.userAnswers.length;
-
-      // Calculate completed stages (10 answers per stage)
-      const answerCounts: Record<number, number> = {};
-      latestSession.userAnswers.forEach((a) => {
-        answerCounts[a.stageNumber] = (answerCounts[a.stageNumber] || 0) + 1;
+  useEffect(() => {
+    fetch('/api/categories')
+      .then(res => res.json())
+      .then(data => {
+        setCategories(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Failed to fetch categories:', err);
+        setLoading(false);
       });
+  }, []);
 
-      Object.values(answerCounts).forEach(count => {
-        if (count >= 10) completedStages++;
-      });
-    }
-
-    return {
-      id: t.id,
-      name: t.name,
-      totalQuestions: t._count.questions,
-      setsStarted: latestSession?.setsStarted || 0,
-      scorePercent: latestSession?.scorePercent || 0,
-      questionsAnswered,
-      completedStages
-    };
-  });
-}
-
-export default async function Home() {
-  const topics = await getTopics();
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '100px 20px' }}>
+        <div style={{ fontSize: '1.2rem', color: 'var(--text-dim)' }}>Loading categories...</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="container" style={{ paddingTop: '60px', paddingBottom: '80px' }}>
-      <header style={{ marginBottom: '60px', textAlign: 'center' }}>
+    <>
+      <header style={{ textAlign: 'center', marginBottom: '60px', marginTop: '40px' }}>
         <div style={{
           display: 'inline-block',
           padding: '4px 12px',
@@ -83,20 +61,22 @@ export default async function Home() {
           <span style={{ color: 'var(--text-dim)' }}>One mock at a time.</span>
         </h1>
         <p style={{ color: 'var(--text-dim)', maxWidth: '500px', margin: '0 auto', fontSize: '1.1rem', lineHeight: '1.6' }}>
-          Realistic scenario-based questions curated for candidates to help you ace your PM interviews.
+          Expert-curated scenario-based questions to help you ace your PM interviews.
         </p>
       </header>
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
-        gap: '40px',
-        paddingBottom: '100px'
-      }}>
-        {topics.map(topic => (
-          <TopicCard key={topic.id} topic={topic} />
-        ))}
-      </div>
-    </div>
+      <section>
+        <h2 style={{ marginBottom: '32px', fontSize: '1.5rem' }}>Categories</h2>
+        <div className="grid" style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+          gap: '24px'
+        }}>
+          {categories.map(category => (
+            <CategoryCard key={category.id} category={category} />
+          ))}
+        </div>
+      </section>
+    </>
   );
 }

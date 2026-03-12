@@ -8,16 +8,20 @@ export interface Question {
     options: Options;
     correctOption: string;
     explanation: string;
-    topic?: string;
+    subcategoryName?: string;
+    categoryName?: string;
     difficulty?: string;
     experience_level?: string;
 }
 
 export interface Session {
-    sessionId: string;
-    topicName: string;
-    stage: number;
+    sessionId: number;
+    subcategoryName: string;
+    categoryName: string;
+    stageNumber: number;
+    difficulty: string;
     questions: Question[];
+    answers?: Answers;
 }
 
 export interface TestAnswer {

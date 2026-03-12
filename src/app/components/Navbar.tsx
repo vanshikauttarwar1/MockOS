@@ -24,6 +24,7 @@ export default function Navbar() {
                 justifyContent: 'space-between'
             }}>
                 <Link href="/" style={{ textDecoration: 'none', fontWeight: 700, fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src="/logo.png" alt="SwitchOS Logo" style={{ width: '32px', height: '32px', borderRadius: '8px' }} />
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         SwitchOS <span style={{ opacity: 0.5, fontWeight: 500 }}>PM Mock</span>

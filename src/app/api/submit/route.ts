@@ -22,17 +22,12 @@ export async function POST(request: Request) {
             }
         });
 
-        // 2. Recalculate Score for Session
-        // Score depends on 'setsStarted'. 
-        // Total Questions = setsStarted * 10
-        // Score = (Correct / Total) * 100
-
+        // 2. Update Session Stats
         const session = await prisma.testSession.findUnique({
             where: { id: sessionId },
             include: {
-                userAnswers: {
-                    where: { isCorrect: true }
-                }
+                subcategory: true,
+                userAnswers: true
             }
         });
 
@@ -40,42 +35,40 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Session not found' }, { status: 404 });
         }
 
-        const totalCorrect = session.userAnswers.length; // Count of correct
-        const setsStarted = session.setsStarted || 1;
-        const totalQuestions = setsStarted * 10;
+        const totalAnswered = session.userAnswers.length;
+        const totalCorrect = session.userAnswers.filter(a => a.isCorrect).length;
+        const totalQuestions = session.subcategory.totalQuestions;
 
-        const scorePercent = Math.round((totalCorrect / totalQuestions) * 100);
+        const scorePercent = totalAnswered > 0
+            ? Math.round((totalCorrect / totalAnswered) * 100)
+            : 0;
 
-        // Update Session
-        // Check if we are done with questions? The user can answer in any order?
-        // Simple logic: If count of userAnswers equals totalQuestions, mark complete.
+        const isCompleted = totalAnswered >= totalQuestions;
 
         await prisma.testSession.update({
             where: { id: sessionId },
             data: {
                 totalCorrect,
                 scorePercent,
-                // Mark completed if we have enough answers. 
-                // Note: userAnswers might include duplicates if we allowed re-submission, but logic above creates always.
-                // Better to rely on frontend to say "I'm done" OR check if total answers >= total questions.
-                isCompleted: totalCorrect + (session.userAnswers.length - totalCorrect) >= totalQuestions,
-                endedAt: (totalCorrect + (session.userAnswers.length - totalCorrect) >= totalQuestions) ? new Date() : undefined
+                isCompleted,
+                endedAt: isCompleted ? new Date() : undefined
             }
         });
-
-        // Re-fetch to confirm completion status if needed
-        const updatedSession = await prisma.testSession.findUnique({ where: { id: sessionId } });
 
         return NextResponse.json({
             success: true,
             scorePercent,
             totalCorrect,
-            isCompleted: updatedSession?.isCompleted
+            isCompleted
         });
 
     } catch (error) {
         console.error("Submit API Error:", error);
-        // Return success:false so frontend can handle retries if needed, but here 500
+        // If unique constraint failed (already answered), that's fine, return current state
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((error as any).code === 'P2002') {
+            return NextResponse.json({ success: true, message: 'Already answered' });
+        }
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

@@ -1,10 +1,10 @@
-import { generateUserPrompt, generateExplanationPrompt } from './prompts';
+import { generateUserPrompt, generateExplanationPrompt, generateHistoryPrompt, GENERATE_EXPLANATION_SYSTEM_PROMPT } from './prompts';
 
 describe('AI Prompt Generation', () => {
     describe('generateUserPrompt', () => {
         test('contains mandatory sections for general topics', () => {
             const prompt = generateUserPrompt('Estimation');
-            expect(prompt).toContain('Generate exactly 50 unique multiple-choice questions');
+            expect(prompt).toContain('Generate exactly 10 unique multiple-choice questions');
             expect(prompt).toContain('STRICT DIFFICULTY DISTRIBUTION');
             expect(prompt).toContain('Estimation');
         });
@@ -25,26 +25,34 @@ describe('AI Prompt Generation', () => {
     describe('generateExplanationPrompt', () => {
         const mockOptions = { A: 'Opt A', B: 'Opt B', C: 'Opt C', D: 'Opt D' };
 
-        test('includes "WHY [CORRECT] IS THE BEST ANSWER" for correct answers', () => {
+        test('passes question data correctly', () => {
             const prompt = generateExplanationPrompt('Question?', mockOptions, 'A', 'A');
-            expect(prompt).toContain('WHY A IS THE BEST ANSWER');
+            expect(prompt).toContain('QUESTION: Question?');
+            expect(prompt).toContain('CORRECT ANSWER: A');
         });
 
-        test('includes "WHY [USER] IS INCORRECT" for wrong answers', () => {
-            const prompt = generateExplanationPrompt('Question?', mockOptions, 'A', 'B');
-            expect(prompt).toContain('WHY A IS THE CORRECT ANSWER');
-            expect(prompt).toContain('WHY B IS INCORRECT');
+        test('system prompt requests structured JSON', () => {
+            expect(GENERATE_EXPLANATION_SYSTEM_PROMPT).toContain("Structured Explanation");
+            expect(GENERATE_EXPLANATION_SYSTEM_PROMPT).toContain("why_correct");
+            expect(GENERATE_EXPLANATION_SYSTEM_PROMPT).toContain("why_wrong");
         });
 
-        test('explicitly requests examples', () => {
-            const prompt = generateExplanationPrompt('Question?', mockOptions, 'A', 'B');
-            expect(prompt.toLowerCase()).toContain('example');
+        test('system prompt restricts visual types', () => {
+            expect(GENERATE_EXPLANATION_SYSTEM_PROMPT).toContain("DIAGRAM");
+            expect(GENERATE_EXPLANATION_SYSTEM_PROMPT).toContain("GRAPH");
+            expect(GENERATE_EXPLANATION_SYSTEM_PROMPT).not.toContain("MEME");
+            expect(GENERATE_EXPLANATION_SYSTEM_PROMPT).not.toContain("CONCEPT_IMAGE");
         });
+    });
 
-        test('does not contain banned phrases "real-world" or "real-life"', () => {
-            const prompt = generateExplanationPrompt('Question?', mockOptions, 'A', 'B');
-            expect(prompt.toLowerCase()).not.toContain('real-world');
-            expect(prompt.toLowerCase()).not.toContain('real-life');
+    describe('generateHistoryPrompt', () => {
+        test('formats history data correctly', () => {
+            const stages = [{ stage_number: 1, questions_attempted: 10 }];
+            const prompt = generateHistoryPrompt('Strategy', stages, 50);
+
+            expect(prompt).toContain('SUBCATEGORY: Strategy');
+            expect(prompt).toContain('TOTAL_QUESTIONS: 50');
+            expect(prompt).toContain('questions_attempted": 10');
         });
     });
 });

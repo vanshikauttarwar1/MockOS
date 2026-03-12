@@ -4,15 +4,21 @@ export async function POST(request: Request) {
     try {
         const { question, options, correctOption, userOption } = await request.json();
 
-        if (!question || !options || !correctOption || !userOption) {
-            return new Response(JSON.stringify({ error: 'Missing fields' }), { status: 400 });
+        const missing = [];
+        if (!question) missing.push('question');
+        if (!options) missing.push('options');
+        if (!correctOption) missing.push('correctOption');
+        if (!userOption) missing.push('userOption');
+
+        if (missing.length > 0) {
+            return new Response(JSON.stringify({ error: `Missing fields: ${missing.join(', ')}` }), { status: 400 });
         }
 
         const explanation = await generateExplanation(question, options, correctOption, userOption);
 
-        return new Response(explanation, {
+        return new Response(JSON.stringify(explanation), {
             headers: {
-                'Content-Type': 'text/plain; charset=utf-8',
+                'Content-Type': 'application/json',
             },
         });
 

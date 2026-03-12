@@ -1,143 +1,58 @@
 import { PrismaClient } from '@prisma/client';
 import Link from 'next/link';
-import { calculateProgress } from '../../lib/progress';
 
-// Force dynamic to ensure data is fresh
 export const dynamic = 'force-dynamic';
 const prisma = new PrismaClient();
 
-interface TopicWithHistory {
-    id: number;
-    name: string;
-    totalQuestions: number;
-    setsStarted: number;
-    scorePercent: number;
-    hasHistory: boolean;
-    allStagesCompleted: boolean;
-    completedStages: number;
-    questionsAnswered: number;
-}
-
-async function getTopicsWithHistory(): Promise<TopicWithHistory[]> {
-    const topics = await prisma.topic.findMany({
-        include: {
-            _count: { select: { questions: true } },
+export default async function HistoryPage() {
+    const subcategories = await prisma.subcategory.findMany({
+        where: {
             sessions: {
-                orderBy: { startedAt: 'desc' },
-                take: 1,
+                some: {} // Has at least one session
+            }
+        },
+        include: {
+            category: true,
+            sessions: {
                 include: { userAnswers: true }
             }
         }
     });
 
-    return topics.map((t) => {
-        const session = t.sessions[0];
-
-        let progress = {
-            currentStage: 1,
-            questionsRemainingInStage: 10,
-            allStagesCompleted: false,
-            completedStages: 0
-        };
-
-        if (session && session.userAnswers) {
-            progress = calculateProgress(session.userAnswers);
-        }
-
-        return {
-            id: t.id,
-            name: t.name,
-            totalQuestions: t._count.questions,
-            setsStarted: progress.currentStage,
-            scorePercent: session?.scorePercent || 0,
-            hasHistory: (session?.setsStarted || 0) > 0,
-            allStagesCompleted: progress.allStagesCompleted,
-            completedStages: progress.completedStages, // Pass specific count
-            questionsAnswered: session?.userAnswers?.length || 0
-        };
-    });
-}
-
-export default async function HistoryPage() {
-    const topics = await getTopicsWithHistory();
-
     return (
         <div className="container" style={{ paddingTop: '60px', paddingBottom: '80px' }}>
             <h1 style={{ marginBottom: '40px', fontSize: '2.5rem' }}>Your History</h1>
 
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
-                gap: '40px'
-            }}>
-                {topics.map((topic) => (
-                    topic.hasHistory ? (
-                        <Link key={topic.id} href={`/history/${topic.id}`} className="card" style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            textDecoration: 'none',
-                            color: 'inherit',
-                            cursor: 'pointer'
+            <div style={{ display: 'grid', gap: '20px', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))' }}>
+                {subcategories.map(sub => {
+                    const allAnswers = sub.sessions.flatMap(s => s.userAnswers);
+                    const totalAnswered = allAnswers.length;
+                    const totalCorrect = allAnswers.filter(a => a.isCorrect).length;
+                    const progress = Math.round((totalAnswered / sub.totalQuestions) * 100);
+                    const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
+
+                    return (
+                        <Link key={sub.id} href={`/subcategory/${sub.id}`} className="card" style={{
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                            textDecoration: 'none', color: 'inherit', cursor: 'pointer'
                         }}>
                             <div>
-                                <div style={{
-                                    width: '48px', height: '48px',
-                                    background: 'var(--surface-highlight)',
-                                    borderRadius: '12px',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    fontSize: '1.2rem', fontWeight: 700,
-                                    marginBottom: '16px'
-                                }}>
-                                    {topic.name.charAt(0)}
+                                <div style={{ fontSize: '0.9rem', color: 'var(--text-dim)', marginBottom: '4px' }}>
+                                    {sub.category.name}
                                 </div>
-                                <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem' }}>{topic.name}</h3>
-                                <p style={{ color: 'var(--text-dim)', fontSize: '0.9rem' }}>
-                                    {topic.allStagesCompleted
-                                        ? <span style={{ color: 'var(--success)' }}>All Stages Completed • {topic.scorePercent}% Score</span>
-                                        : (
-                                            <span>
-                                                {Math.round((topic.questionsAnswered / 50) * 100)}% ({topic.questionsAnswered}/50) • {topic.completedStages}/5 Stages
-                                            </span>
-                                        )}
-                                </p>
+                                <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem' }}>{sub.name}</h3>
+                                <div style={{ display: 'flex', gap: '16px', fontSize: '0.9rem', color: 'var(--text-dim)' }}>
+                                    <span>{progress}% Complete</span>
+                                    <span>{accuracy}% Accuracy</span>
+                                </div>
                             </div>
-
-                            <div className="secondary-btn" style={{ textAlign: 'center', width: 'fit-content' }}>
-                                View Performance
-                            </div>
+                            <div className="secondary-btn">Continue</div>
                         </Link>
-                    ) : (
-                        <div key={topic.id} className="card" style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            opacity: 0.5,
-                            cursor: 'not-allowed'
-                        }}>
-                            <div>
-                                <div style={{
-                                    width: '48px', height: '48px',
-                                    background: 'var(--surface-highlight)',
-                                    borderRadius: '12px',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    fontSize: '1.2rem', fontWeight: 700,
-                                    marginBottom: '16px'
-                                }}>
-                                    {topic.name.charAt(0)}
-                                </div>
-                                <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem' }}>{topic.name}</h3>
-                                <p style={{ color: 'var(--text-dim)', fontSize: '0.9rem' }}>
-                                    No history yet
-                                </p>
-                            </div>
-
-                            <div style={{ color: 'var(--text-dim)', fontSize: '0.9rem' }}>
-                                Not Started
-                            </div>
-                        </div>
-                    )
-                ))}
+                    );
+                })}
+                {subcategories.length === 0 && (
+                    <div style={{ color: 'var(--text-dim)' }}>No history yet. Start a test!</div>
+                )}
             </div>
         </div>
     );

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useState, useEffect, use } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface UserAnswer {
     isCorrect: boolean;
@@ -14,17 +14,16 @@ interface UserAnswer {
 }
 
 interface ResultSession {
-    topic: {
-        id: number;
-    };
+    subcategoryId: number;
+    subcategoryName: string;
     scorePercent: number;
-    totalCorrect: number;
-    setsStarted: number;
+    totalCorrect: number; // This might be total for session (all stages)
+    stageNumber: number;
     userAnswers: UserAnswer[];
 }
 
-export default function ResultPage() {
-    const { sessionId } = useParams();
+export default function ResultPage({ params }: { params: Promise<{ sessionId: string }> }) {
+    const { sessionId } = use(params);
     const router = useRouter();
     const [session, setSession] = useState<ResultSession | null>(null);
     const [loading, setLoading] = useState(true);
@@ -43,19 +42,24 @@ export default function ResultPage() {
     if (loading) return <div className="container" style={{ paddingTop: '40px' }}>Loading result...</div>;
     if (!session) return <div className="container">Session not found</div>;
 
+    // Filter answers for the latest stage? 
+    // Usually result page appears after a stage. 
+    // If we just show all answers, it's fine for now.
+    // Ideally we filter by session.stageNumber ? But session API returns currentStage.
+
     return (
         <div className="container" style={{ paddingTop: '40px', paddingBottom: '80px' }}>
-            <button onClick={() => router.push(`/topics/${session.topic.id}`)} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', marginBottom: '20px', cursor: 'pointer' }}>
-                ← Back to Topic
+            <button onClick={() => router.push(`/subcategory/${session.subcategoryId}`)} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', marginBottom: '20px', cursor: 'pointer' }}>
+                ← Back to {session.subcategoryName}
             </button>
 
             <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-                <h1 style={{ fontSize: '2rem', marginBottom: '8px' }}>Stage Summary</h1>
+                <h1 style={{ fontSize: '2rem', marginBottom: '8px' }}>Test Summary</h1>
                 <div style={{ fontSize: '4rem', fontWeight: 800, color: session.scorePercent >= 70 ? 'var(--success)' : 'var(--primary)' }}>
                     {session.scorePercent}%
                 </div>
                 <p style={{ color: 'var(--text-dim)' }}>
-                    You got {session.totalCorrect} out of {session.setsStarted * 10} correct
+                    Accuracy on all questions
                 </p>
             </div>
 

@@ -1,44 +1,105 @@
 'use client';
 
 import React from 'react';
-import ReactMarkdown from 'react-markdown';
 import Mermaid from './Mermaid';
+import ExplanationGraph from './ExplanationGraph';
+
+interface Visual {
+    type: 'DIAGRAM' | 'GRAPH' | 'CONCEPT_IMAGE' | 'MEME';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    content: any;
+    alt?: string;
+}
+
+interface StructuredExplanation {
+    explanation: {
+        why_correct: string;
+        why_wrong: string;
+        key_concept: string;
+    };
+    real_life_example: string;
+    visuals: Visual[];
+}
 
 interface DetailedExplanationProps {
-    content: string;
+    content: StructuredExplanation | string; // Backward compatibility check
 }
 
 const DetailedExplanation: React.FC<DetailedExplanationProps> = ({ content }) => {
+    // Legacy fallback
+    if (typeof content === 'string') {
+        return <div className="detailed-explanation p-4">{content}</div>;
+    }
+
+    const { explanation, real_life_example, visuals } = content;
+
     return (
-        <div className="detailed-explanation">
-            <ReactMarkdown
-                components={{
-                    code({ inline, className, children, ...props }: { inline?: boolean; className?: string; children?: React.ReactNode }) {
-                        const match = /language-(\w+)/.exec(className || '');
-                        const lang = match ? match[1] : '';
+        <div className="detailed-explanation space-y-6">
 
-                        if (!inline && lang === 'mermaid') {
-                            return <Mermaid chart={String(children).replace(/\n$/, '')} />;
-                        }
+            {/* 1. Visuals Section - Rendered Top as requested */}
+            {visuals && visuals.length > 0 && (
+                <div className="visuals-container grid grid-cols-1 gap-6">
+                    {visuals.map((visual, idx) => (
+                        <div key={idx} className="visual-item border border-gray-700 rounded-lg p-4 bg-gray-900/50 flex flex-col items-center">
 
-                        return (
-                            <code className={className} {...props}>
-                                {children}
-                            </code>
-                        );
-                    },
-                    // Enhance appearance of other markdown elements
-                    h1: ({ children }) => <h1 style={{ fontSize: '1.5rem', margin: '24px 0 16px', color: 'var(--text-main)' }}>{children}</h1>,
-                    h2: ({ children }) => <h2 style={{ fontSize: '1.3rem', margin: '20px 0 12px', color: 'var(--text-main)' }}>{children}</h2>,
-                    h3: ({ children }) => <h3 style={{ fontSize: '1.1rem', margin: '16px 0 8px', color: 'var(--text-main)' }}>{children}</h3>,
-                    p: ({ children }) => <p style={{ margin: '0 0 16px 0', lineHeight: '1.6', color: 'var(--text-dim)' }}>{children}</p>,
-                    ul: ({ children }) => <ul style={{ listStyleType: 'disc', paddingLeft: '24px', marginBottom: '16px' }}>{children}</ul>,
-                    li: ({ children }) => <li style={{ marginBottom: '8px', color: 'var(--text-dim)' }}>{children}</li>,
-                    strong: ({ children }) => <strong style={{ color: 'var(--text-main)', fontWeight: 600 }}>{children}</strong>,
-                }}
-            >
-                {content}
-            </ReactMarkdown>
+                            {visual.type === 'DIAGRAM' && (
+                                <div className="w-full overflow-x-auto">
+                                    <Mermaid chart={visual.content} />
+                                </div>
+                            )}
+
+                            {visual.type === 'GRAPH' && (
+                                <ExplanationGraph config={visual.content} />
+                            )}
+
+                            {(visual.type === 'CONCEPT_IMAGE' || visual.type === 'MEME') && (
+                                <div className="relative w-full max-w-xl">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                        src={visual.content}
+                                        alt={visual.alt || 'AI generated visual'}
+                                        className="w-full h-auto rounded-md shadow-lg"
+                                    />
+                                    {visual.type === 'MEME' && (
+                                        <p className="text-center text-sm text-gray-400 mt-2 italic">&quot;{visual.alt}&quot;</p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* 2. Structured Sections */}
+            <div className="text-sections space-y-4">
+
+                {/* Real Life Example */}
+                {real_life_example && (
+                    <div className="bg-blue-900/20 border-l-4 border-blue-500 p-4 rounded-r-md">
+                        <h3 className="text-blue-400 font-bold mb-1 uppercase text-xs tracking-wider">Real-Life Example</h3>
+                        <p className="text-gray-200 italic">{real_life_example}</p>
+                    </div>
+                )}
+
+                {/* Why Correct */}
+                <div className="bg-green-900/20 border-l-4 border-green-500 p-4 rounded-r-md">
+                    <h3 className="text-green-400 font-bold mb-1 uppercase text-xs tracking-wider">Why Correct</h3>
+                    <p className="text-gray-200">{explanation.why_correct}</p>
+                </div>
+
+                {/* Why Wrong */}
+                <div className="bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r-md">
+                    <h3 className="text-red-400 font-bold mb-1 uppercase text-xs tracking-wider">Why Wrong</h3>
+                    <p className="text-gray-200">{explanation.why_wrong}</p>
+                </div>
+
+                {/* Key Concept */}
+                <div className="bg-purple-900/20 border border-purple-500/30 p-4 rounded-lg text-center">
+                    <h3 className="text-purple-400 font-bold mb-2 uppercase text-xs tracking-wider">Key Concept</h3>
+                    <p className="text-xl font-semibold text-white">{explanation.key_concept}</p>
+                </div>
+            </div>
+
         </div>
     );
 };

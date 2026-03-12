@@ -1,60 +1,74 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { Session, Answers } from '@/lib/types';
+import { useState, useEffect, use } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import DetailedExplanation from '@/app/components/DetailedExplanation';
 
-export default function TestPage() {
-    const { sessionId } = useParams();
+interface Question {
+    id: number;
+    text: string;
+    options: { A: string; B: string; C: string; D: string };
+    correctOption: string;
+}
+
+interface StageSession {
+    sessionId: number;
+    subcategoryId: number;
+    subcategoryName: string;
+    categoryName: string;
+    stageNumber: number;
+    difficulty: string;
+    questions: Question[];
+    answers: { questionId: number; selectedOption: string; isCorrect: boolean }[];
+    totalQuestions: number;
+}
+
+interface Answers {
+    [questionId: number]: string;
+}
+
+export default function TestPage({ params }: { params: Promise<{ sessionId: string }> }) {
+    const { sessionId } = use(params);
+    const searchParams = useSearchParams();
+    const stageNumber = parseInt(searchParams.get('stage') || '1');
     const router = useRouter();
 
-    const [session, setSession] = useState<Session | null>(null);
+    const [session, setSession] = useState<StageSession | null>(null);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [answers, setAnswers] = useState<Answers>({});
-    const [explanation, setExplanation] = useState<string | null>(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [explanation, setExplanation] = useState<any>(null);
     const [loadingExplanation, setLoadingExplanation] = useState(false);
     const [showIncorrectPopup, setShowIncorrectPopup] = useState(false);
 
     useEffect(() => {
-        const stored = localStorage.getItem('currentTestSession');
+        // Try to load from localStorage first
+        const stored = localStorage.getItem(`stage_${sessionId}_${stageNumber}`);
         if (stored) {
-            const data = JSON.parse(stored);
+            const data = JSON.parse(stored) as StageSession;
             setSession(data);
-            if (data.answers) {
-                setAnswers(data.answers);
 
-                // Find first unanswered question
-                const index = data.questions.findIndex((q: { id: number }) => !data.answers[q.id]);
-                if (index !== -1) {
-                    setCurrentQuestionIndex(index);
-                }
+            // Build answers object from existing answers
+            const existingAnswers: Answers = {};
+            data.answers?.forEach(a => {
+                existingAnswers[a.questionId] = a.selectedOption;
+            });
+            setAnswers(existingAnswers);
+
+            // Find first unanswered question
+            const index = data.questions.findIndex(q => !existingAnswers[q.id]);
+            if (index !== -1) {
+                setCurrentQuestionIndex(index);
             }
         } else {
-            // Fallback fetch from API if localStorage is empty
-            fetch(`/api/session/${sessionId}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.error) throw new Error(data.error);
-                    const formattedSession = {
-                        sessionId: data.id,
-                        questions: data.questions || data.topic.questions.slice(0, 10), // simplified for now
-                        stage: data.stageNumber || 1,
-                        topicName: data.topic.name
-                    };
-                    setSession(formattedSession);
-
-                    const dbAnswers: Answers = {};
-                    data.userAnswers?.forEach((ua: { questionId: number, selectedOption: string }) => {
-                        dbAnswers[ua.questionId] = ua.selectedOption;
-                    });
-                    setAnswers(dbAnswers);
-                })
-                .catch(() => router.push('/'));
+            // Redirect back if no session data
+            router.push('/');
         }
-    }, [router, sessionId]);
+    }, [sessionId, stageNumber, router]);
 
-    if (!session) return <div className="container" style={{ paddingTop: '60px' }}>Loading session...</div>;
+    if (!session || session.questions.length === 0) {
+        return <div className="container" style={{ paddingTop: '60px' }}>Loading session...</div>;
+    }
 
     const question = session.questions[currentQuestionIndex];
     if (!question) return <div className="container">Question not found</div>;
@@ -74,20 +88,24 @@ export default function TestPage() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    sessionId: parseInt(sessionId as string),
+                    sessionId: parseInt(sessionId),
                     questionId: question.id,
                     selectedOption: optionKey,
                     isCorrect: optionKey === question.correctOption,
-                    stageNumber: session.stage
+                    stageNumber: session.stageNumber
                 })
             });
 
-            // Update localStorage too for consistency
-            const stored = localStorage.getItem('currentTestSession');
+            // Update localStorage
+            const stored = localStorage.getItem(`stage_${sessionId}_${stageNumber}`);
             if (stored) {
                 const data = JSON.parse(stored);
-                data.answers = newAnswers;
-                localStorage.setItem('currentTestSession', JSON.stringify(data));
+                data.answers = [...(data.answers || []), {
+                    questionId: question.id,
+                    selectedOption: optionKey,
+                    isCorrect: optionKey === question.correctOption
+                }];
+                localStorage.setItem(`stage_${sessionId}_${stageNumber}`, JSON.stringify(data));
             }
         } catch (error) {
             console.error("Failed to record answer:", error);
@@ -103,23 +121,35 @@ export default function TestPage() {
         setExplanation("");
 
         try {
+            if (!question.text) {
+                console.error("Question text is missing for question:", question);
+                throw new Error("Question text is missing.");
+            }
+
+            const payload = {
+                question: question.text,
+                options: question.options,
+                correctOption: question.correctOption,
+                userOption: userAns
+            };
+
             const res = await fetch('/api/explain', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    question: question.text,
-                    options: question.options,
-                    correctOption: question.correctOption,
-                    userOption: userAns
-                })
+                body: JSON.stringify(payload)
             });
 
-            const text = await res.text();
-            setExplanation(text);
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({ error: res.statusText }));
+                throw new Error(errData.error || 'Failed to generate explanation');
+            }
+
+            const data = await res.json();
+            setExplanation(data);
         } catch (e: unknown) {
             console.error("Explain error:", e);
             const message = e instanceof Error ? e.message : 'Unknown error';
-            alert(`Failed to get explanation: ${message}`);
+            alert(`Error: ${message}. Please try again.`);
         } finally {
             setLoadingExplanation(false);
         }
@@ -131,8 +161,9 @@ export default function TestPage() {
         if (currentQuestionIndex < session.questions.length - 1) {
             setCurrentQuestionIndex(currentQuestionIndex + 1);
         } else {
-            // End of stage
-            router.push(`/session/${sessionId}/result`);
+            // End of stage - go back to subcategory page
+            localStorage.removeItem(`stage_${sessionId}_${stageNumber}`);
+            router.push(`/subcategory/${session.subcategoryId}`);
         }
     };
 
@@ -147,7 +178,7 @@ export default function TestPage() {
     return (
         <div style={{ paddingTop: '60px', maxWidth: '800px', margin: '0 auto', paddingBottom: '100px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px', color: 'var(--text-dim)', fontSize: '0.9rem', fontWeight: 500 }}>
-                <span>{session.topicName} — Stage {session.stage}</span>
+                <span>{session.categoryName} › {session.subcategoryName} — Stage {session.stageNumber} ({session.difficulty})</span>
                 <span>Question {currentQuestionIndex + 1} of {session.questions.length}</span>
             </div>
 
@@ -231,7 +262,7 @@ export default function TestPage() {
                                 onClick={() => getExplanation(selectedOption)}
                                 disabled={loadingExplanation || !!explanation}
                             >
-                                {loadingExplanation ? 'Analyzing...' : 'Technical Expert'}
+                                {loadingExplanation ? 'Analyzing...' : 'Expert Deep Dive'}
                             </button>
                         </div>
                         <button className="primary-btn" onClick={nextQuestion}>

@@ -10,19 +10,15 @@ Avoid trivia. Focus on decision-making, trade-offs, and structured thinking.
 Output MUST be in valid JSON format only.
 Do not include any explanation outside JSON.`;
 
-export function generateUserPrompt(topicName: string) {
+export function generateUserPrompt(topicName: string, count: number = 10) {
    if (topicName === "Case Study") {
-      return `Generate exactly 50 unique Case Study MCQs for Product Manager interviews.
+      return `Generate exactly ${count} unique Case Study MCQs for Product Manager interviews.
       
       CONTEXT: These questions must be mini-cases. You must provide a scenario (2-3 sentences) and then ask a strategic question based on it.
       
       STRICT DIFFICULTY DISTRIBUTION:
-      - Questions 1-10: Easy (Basic scenarios)
-      - Questions 11-20: Easy-Medium
-      - Questions 21-30: Medium
-      - Questions 31-40: Medium-Hard
-      - Questions 41-50: Hard (Complex multidimensional trade-offs)
-
+      - All ${count} questions should be appropriate for the requested difficulty level if specified in topic, otherwise mix.
+      
       ACCURACY REQUIREMENTS:
       - Scenarios should be about realistic tech products (e-commerce, social, SaaS, ride-sharing).
       - Focus on: Root Cause Analysis, Launch Strategy, Metric Trade-offs, Crisis Management.
@@ -35,17 +31,14 @@ export function generateUserPrompt(topicName: string) {
       Example Question Text:
       "You are the PM for Instagram Stories. Engagement has dropped 10% after the last release. The engineering team says the release improved load times by 20%. What is the most likely root cause?"
       
-      Return all 50 questions in strict JSON format.`;
+      Return all ${count} questions in strict JSON format.`;
    }
 
-   return `Generate exactly 50 unique multiple-choice questions for Product Manager interviews on the topic: "${topicName}".
+   return `Generate exactly ${count} unique multiple-choice questions for Product Manager interviews on the topic: "${topicName}".
 
-STRICT DIFFICULTY DISTRIBUTION (must follow exactly):
-- Questions 1-10: Easy (target: 1–2 years experience)
-- Questions 11-20: Easy-Medium (target: 2–4 years experience)
-- Questions 21-30: Medium (target: 4–6 years experience)
-- Questions 31-40: Medium-Hard (target: 6–8 years experience)
-- Questions 41-50: Hard (target: 8–10 years experience)
+STRICT DIFFICULTY DISTRIBUTION:
+- Ensure questions align with the difficulty/experience level mentioned in the topic.
+- If no difficulty is specified, provide a mix of Easy to Hard.
 
 ACCURACY REQUIREMENTS:
 - Each question must have ONE and ONLY ONE objectively correct answer
@@ -82,108 +75,66 @@ FOR EACH QUESTION, YOU MUST PROVIDE:
 CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no extra text.
 
 OUTPUT FORMAT:
-[
-  {
-    "id": 1,
-    "topic": "Product Sense",
-    "difficulty": "Easy",
-    "experience_level": "1-2",
-    "question_text": "Your food delivery app saw a 15% drop in daily orders over the past week with no changes to the app. What should you analyze first?",
-    "options": {
-      "A": "Competitor pricing and promotional campaigns",
-      "B": "Order funnel conversion rates by step",
-      "C": "Customer service response times",
-      "D": "Marketing spend allocation"
-    },
-    "correct_option": "B",
-    "explanation": "When orders drop suddenly without product changes, analyzing the conversion funnel identifies exactly where users are dropping off. This follows the diagnostic principle of starting with internal user behavior data before external factors. Funnel analysis provides actionable insights faster than broad market analysis."
-  }
-]
+{
+  "questions": [
+    {
+      "id": 1,
+      "topic": "Product Sense",
+      "difficulty": "Easy",
+        ...
+    }
+  ]
+}
 
 Return all 50 questions in this exact format.`;
 }
 
-export const GENERATE_EXPLANATION_SYSTEM_PROMPT = `You are a Senior Product Management Mentor at a top-tier tech company (Google, Meta, Amazon).
+export const GENERATE_EXPLANATION_SYSTEM_PROMPT = `You are a Senior Product Management Mentor and assessment expert.
 
-Your role is to provide DEEP, EDUCATIONAL explanations that help candidates truly understand PM concepts - not just memorize answers.
+Your task is to generate a structured explanation for a PM interview question with real-life examples and relevant visuals.
 
-TEACHING STYLE:
-- Explain like you're mentoring a promising PM candidate.
-- Connect answers to rich example product scenarios that provide "deeper learning".
-- Start examples with an engaging "hook" to draw the user in.
-- Reference detailed industry examples when relevant (e.g., "This is identical to the challenge Netflix faced when...").
-- Teach the underlying principle and its nuances, not just the specific answer.
+You will receive the Question, Options, User's Answer, and Correct Answer.
 
-VISUAL LEARNING & DIAGRAMS (CONDITIONAL):
-- Include a Mermaid diagram (flowchart, funnel, or state diagram) ONLY when it adds significant value to the explanation (e.g., visualizing a process, decision tree, or logical flow).
-- Do NOT forcefully create a diagram for every question. If the concept is better explained through text alone, skip the diagram.
-- Use funnels (\`\`\`mermaid funnel\` blocks or flowcharts representing stages) for conversion or acquisition questions.
-- For diagrams, use colorful styles to make them visually appealing.
-- Define classes for colors, for example:
-  classDef primary fill:#3498db,stroke:#2980b9,stroke-width:2px,color:#fff;
-  classDef secondary fill:#e67e22,stroke:#d35400,stroke-width:2px,color:#fff;
-  classDef success fill:#2ecc71,stroke:#27ae60,stroke-width:2px,color:#fff;
-- Apply these classes to your nodes.
+REQUIREMENTS:
+1. Structured Explanation:
+   - "why_correct": Provide in-depth reasoning linked to PM principles. Explain NOT JUST 'why' it is the answer, but the underlying strategic logic.
+   - "why_wrong": Analyze specific misconceptions in the distractors. Explain why a candidate might intuitively choose them and why they are suboptimal.
+   - "key_concept": The core framework or concept being tested (e.g., "RICE Prioritization", "Network Effects").
 
-FRAMEWORKS TO REFERENCE:
-- AARRR (Pirate Metrics), RICE, ICE, CIRCLES, HEART
-- North Star Metrics, OKRs, KPIs
-- Jobs-to-be-Done, User Journey Mapping
-- Build-Measure-Learn, Double Diamond
-- Prioritization matrices, Trade-off analysis
+2. Real-Life Example:
+   - A detailed 3-4 sentence scenario illustrating the concept in a REAL product context (e.g., Netflix, Uber, Spotify). Make it concrete and actionable.
 
-Be thorough and educational. This is a learning opportunity.`;
+3. Visuals:
+   - Include 1 to 2 visual types MAX.
+   - Choose from:
+     - "DIAGRAM" (Mermaid): For processes, flows, or architectures.
+     - "GRAPH" (Chart.js): For metrics, trends, or data comparisons.
+   
+OUTPUT FORMAT (JSON ONLY):
+{
+  "explanation": {
+    "why_correct": "...",
+    "why_wrong": "...",
+    "key_concept": "..."
+  },
+  "real_life_example": "...",
+  "visuals": [
+    {
+      "type": "DIAGRAM",
+      "content": "graph TD; A[Start] --> B[End]"
+    },
+    {
+      "type": "GRAPH",
+      "content": { "type": "bar", "data": { "labels": ["A", "B"], "datasets": [{ "label": "Metric", "data": [10, 20] }] } }
+    }
+  ]
+}
+
+- For GRAPH content, return a valid Chart.js configuration object (JSON).
+- Ensure strict JSON validity.`;
 
 export function generateExplanationPrompt(question: string, options: Options, correct: string, userAns: string) {
-   const isCorrect = correct === userAns;
-
-   let sections = '';
-
-   if (isCorrect) {
-      sections = `
-1. WHY ${correct} IS THE BEST ANSWER:
-   - Explain the core reasoning using specific PM frameworks.
-   - Connect to a deep example with an engaging hook.
-   
-2. VISUAL FLOW / LOGIC (Optional Mermaid Diagram):
-   - Provide a colorful Mermaid diagram (using \`\`\`mermaid\` blocks) ONLY if it clarifies a process, trade-off, or framework related to this question.
-   - If a funnel is relevant, use a flowchart to represent the stages.
-   
-3. DEEPER UNDERSTANDING:
-   - Explain the underlying PM principle being tested in depth.
-   - How would this principle manifest in different company cultures (e.g., data-driven vs. vision-driven)?
-   
-4. PM FRAMEWORK SPOTLIGHT:
-   - Name the key framework/concept.
-   - Provide a nuanced explanation of when (and when NOT) to apply it.
-
-5. PRO TIP (Senior PM Perspective):
-   - Share a sophisticated insight or a common "hidden" pitfall related to this topic.`;
-   } else {
-      sections = `
-1. WHY ${correct} IS THE CORRECT ANSWER:
-   - Explain the reasoning step-by-step with deep context.
-   - Reference specific PM frameworks and a high-stakes example with a strong hook.
-
-2. VISUAL FLOW / LOGIC (Optional Mermaid Diagram):
-   - Provide a colorful Mermaid diagram (using \`\`\`mermaid\` blocks) ONLY if it helps visualize why the correct answer is superior or shows the logic in action.
-   
-3. WHY ${userAns} IS INCORRECT (Common Trap):
-   - Identify the specific misconception or "managerial" trap (e.g., over-indexing on technical constraints vs. user value).
-   - Explain what would happen in a real product if you chose this path.
-
-4. THE KEY LESSON & DEEPER LEARNING:
-   - What fundamental PM principle was missed?
-   - Connect to broader concepts candidates should master for senior roles.
-
-5. INTERVIEW TIP:
-   - How to articulate this reasoning clearly in a live interview setting.`;
-   }
-
-   return `A user answered a Product Management interview question.
-
-QUESTION:
-${question}
+   return `QUESTION: ${question}
 
 OPTIONS:
 A: ${options.A}
@@ -192,17 +143,68 @@ C: ${options.C}
 D: ${options.D}
 
 CORRECT ANSWER: ${correct}
-USER'S ANSWER: ${userAns}
+USER ANSWER: ${userAns}
 
-INSTRUCTIONS:
-- Provide a COMPREHENSIVE, EDUCATIONAL explanation.
-- This is a DEEPER LEARNING moment - be thorough and detailed.
-- Use clear section headers.
-- Emphasize depth and engaging hooks in your examples.
-- Include a Mermaid diagram ONLY if it adds value.
-- You can use markdown for formatting (bold, italics, lists).
-
-${sections}
-
-Aim for 400-500 words. Be thorough, mentoring, and highly educational.`;
+Generate the structured JSON response now.`;
 }
+
+export const GENERATE_HISTORY_SUMMARY_SYSTEM_PROMPT = `You are an AI assistant for a Product Management mock test platform. 
+
+A user has completed one or more stages of a subcategory. Each subcategory contains 5 stages, with multiple questions per stage. Questions may be attempted or unattempted. 
+
+Your task is to generate a **structured history summary** for display in the history page.
+
+REQUIREMENTS:
+1. For the Subcategory Card:
+   - Calculate **Stage Completion**: a stage is complete only if all questions attempted
+   - Calculate **Subcategory Completion**: % of stages completed (completed_stages / 5 * 100)
+   - For completed stages, show **marks %** (correct / total questions in stage)
+   - For incomplete stages, show **X questions remaining** and mark progress as "in progress"
+   - Display **overall subcategory progress** (questions attempted / total questions)
+
+2. Summary Output:
+Return JSON ONLY (no extra text) in this structure:
+
+{
+  "subcategory_name": "{subcategory_name}",
+  "total_questions": 50,
+  "questions_attempted": 32,
+  "overall_progress_percent": 64,
+  "stages": [
+    {
+      "stage_number": 1,
+      "questions_attempted": 10,
+      "questions_total": 10,
+      "completed": true,
+      "marks_percent": 70
+    },
+    ...
+    {
+      "stage_number": 3,
+      "questions_attempted": 5,
+      "questions_total": 10,
+      "completed": false,
+      "questions_remaining": 5
+    }
+  ],
+  "completed_stages_count": 2,
+  "sub_category_completion_percent": 40
+}
+
+Rules:
+- Only calculate marks for **completed stages**
+- Overall progress can be fractional but round to nearest whole number
+- Include **questions remaining** for incomplete stages
+- Do not include explanation text, only JSON`;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function generateHistoryPrompt(subcategoryName: string, stagesAttempted: any[], totalQuestions: number) {
+   return `SUBCATEGORY: ${subcategoryName}
+STAGES_ATTEMPTED: ${JSON.stringify(stagesAttempted, null, 2)}
+TOTAL_QUESTIONS: ${totalQuestions}
+TOTAL_STAGES: 5
+
+Generate the structured history summary JSON.`;
+}
+
+

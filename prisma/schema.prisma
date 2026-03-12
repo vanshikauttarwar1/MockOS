@@ -1,31 +1,46 @@
 generator client {
   provider = "prisma-client-js"
 }
+
 datasource db {
   provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
+model Category {
+  id            Int           @id @default(autoincrement())
+  name          String        @unique
+  description   String        // Interview relevance line
+  subcategories Subcategory[]
+}
 
-model Topic {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  questions Question[]
-  sessions  TestSession[]
+model Subcategory {
+  id                Int           @id @default(autoincrement())
+  categoryId        Int
+  category          Category      @relation(fields: [categoryId], references: [id])
+  name              String
+  description       String        // Contextual description
+  totalQuestions    Int           // 25, 30, 40, or 50
+  questionsPerStage Int           // Computed: totalQuestions / 5
+  questions         Question[]
+  sessions          TestSession[]
+
+  @@unique([categoryId, name])
 }
 
 model Question {
-  id               Int      @id @default(autoincrement())
-  topicId          Int
-  topic            Topic    @relation(fields: [topicId], references: [id])
-  difficulty       String   // Easy, Medium, Hard, etc.
-  experienceLevel  String   // 1-2, 2-4, etc.
+  id               Int          @id @default(autoincrement())
+  subcategoryId    Int
+  subcategory      Subcategory  @relation(fields: [subcategoryId], references: [id])
+  stageNumber      Int          // 1-5 (for difficulty grouping)
+  difficulty       String       // Easy, Easy-Medium, Medium, Medium-Hard, Hard
+  experienceLevel  String       // 1-2, 2-4, 4-6, 6-8, 8-10
   text             String
   optionA          String
   optionB          String
   optionC          String
   optionD          String
-  correctOption    String   // "A", "B", "C", "D"
+  correctOption    String       // "A", "B", "C", "D"
   explanation      String
   
   userAnswers      UserAnswer[]
@@ -33,12 +48,12 @@ model Question {
 
 model TestSession {
   id            Int          @id @default(autoincrement())
-  topicId       Int
-  topic         Topic        @relation(fields: [topicId], references: [id])
+  subcategoryId Int
+  subcategory   Subcategory  @relation(fields: [subcategoryId], references: [id])
+  currentStage  Int          @default(1) // 1-5
   startedAt     DateTime     @default(now())
   endedAt       DateTime?
   isCompleted   Boolean      @default(false)
-  setsStarted   Int          @default(0) // 0 to 5
   totalCorrect  Int          @default(0)
   scorePercent  Float        @default(0.0)
   
@@ -54,4 +69,6 @@ model UserAnswer {
   selectedOption String       // "A", "B", etc.
   isCorrect      Boolean
   stageNumber    Int          // 1-5
+
+  @@unique([sessionId, questionId])
 }
